@@ -1,0 +1,102 @@
+﻿<Window x:Class="EpubMaker.MainWindow"
+		xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+		xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+		xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+		xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+		xmlns:local="clr-namespace:EpubMaker"
+		mc:Ignorable="d"
+		Title="MainWindow" Height="450" Width="800">
+	<Grid Margin="15">
+		<Grid.RowDefinitions>
+			<!-- 巻リスト -->
+			<RowDefinition Height="2*"/>
+			<!-- 画像プレビュー -->
+			<RowDefinition Height="3*"/>
+			<!-- 操作エリア -->
+			<RowDefinition Height="Auto"/>
+		</Grid.RowDefinitions>
+
+		<!-- 巻リスト -->
+		<ListView Grid.Row="0" 
+			ItemsSource="{Binding VolumeList}" 
+			SelectedItem="{Binding SelectedVolume, Mode=TwoWay}">
+			<ListView.View>
+				<GridView>
+					<!-- 出力対象フラグ -->
+					<GridViewColumn Header="選択" Width="50">
+						<GridViewColumn.CellTemplate>
+							<DataTemplate>
+								<CheckBox IsChecked="{Binding IsTarget, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+									HorizontalAlignment="Center"/>
+							</DataTemplate>
+						</GridViewColumn.CellTemplate>
+					</GridViewColumn>
+
+					<!-- 手動リネーム用テキストボックス（英字を日本語にその場で変更） -->
+					<GridViewColumn Header="巻名 (クリックして変更可能)" Width="280">
+						<GridViewColumn.CellTemplate>
+							<DataTemplate>
+								<TextBox Text="{Binding VolumeName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+									BorderThickness="0" Background="Transparent" VerticalAlignment="Center"/>
+							</DataTemplate>
+						</GridViewColumn.CellTemplate>
+					</GridViewColumn>
+
+					<!-- 状態表示 -->
+					<GridViewColumn Header="ステータス" DisplayMemberBinding="{Binding Status}" Width="130"/>
+
+					<!-- ページ数 -->
+					<GridViewColumn Header="ページ数" DisplayMemberBinding="{Binding PageCount}" Width="80"/>
+
+					<!-- 巻名変更に自動連動する出力ファイル名プレビュー -->
+					<GridViewColumn Header="出力ファイル名" DisplayMemberBinding="{Binding OutputFileName}" Width="250"/>
+				</GridView>
+			</ListView.View>
+		</ListView>
+
+		<!-- 画像プレビュー -->
+		<GroupBox Grid.Row="1" Header="ページプレビュー（クリックで除外/復活）" Margin="0,15,0,0">
+			<ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+				<ItemsControl ItemsSource="{Binding SelectedVolume.Pages}">
+					<ItemsControl.ItemsPanel>
+						<ItemsPanelTemplate>
+							<WrapPanel Orientation="Horizontal" Margin="5"/>
+						</ItemsPanelTemplate>
+					</ItemsControl.ItemsPanel>
+					<ItemsControl.ItemTemplate>
+						<DataTemplate>
+							<!-- トグルボタンでクリック時の除外状態を管理 -->
+							<ToggleButton IsChecked="{Binding IsExcluded, Mode=TwoWay}" Margin="5" Padding="0" BorderThickness="1">
+								<StackPanel Width="90" Height="130" Background="#FAFAFA">
+									<Image Source="{Binding ImagePath}" Width="90" Height="110" Stretch="Uniform"/>
+									<TextBlock Text="{Binding FileName}" FontSize="10" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+								</StackPanel>
+							</ToggleButton>
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+				</ItemsControl>
+			</ScrollViewer>
+		</GroupBox>
+
+		<!-- 操作エリア -->
+		<Grid Grid.Row="2" Margin="0,15,0,0">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="Auto"/>
+				<ColumnDefinition Width="*"/>
+				<ColumnDefinition Width="Auto"/>
+				<ColumnDefinition Width="160"/>
+			</Grid.ColumnDefinitions>
+
+			<TextBlock Grid.Column="0" Text="出力先フォルダ:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+
+			<TextBox Grid.Column="1" Text="{Binding OutputDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+				VerticalAlignment="Center" Height="28"/>
+
+			<Button Grid.Column="2" Content="参照..." Command="{Binding BrowseDirectoryCommand}" 
+			Width="60" Height="28" Margin="5,0"/>
+
+			<Button Grid.Column="3" Content="変換" Command="{Binding StartConversionCommand}" 
+			Height="30" FontWeight="Bold" Background="#007ACC" Foreground="White"/>
+		</Grid>
+	</Grid>
+</Window>
