@@ -1,6 +1,7 @@
 using System.IO;
 
 using System.Diagnostics;
+using System.Net.Http.Headers;
 
 namespace EpubMaker
 {
@@ -66,22 +67,30 @@ namespace EpubMaker
 
 		#region MainWindowViewModel メソッド
 
+		// <summary>
+		// コンストラクタ
+		// </summary>
 		public MainWindowViewModel()
 		{
-			// アプリケーション終了コマンド
-			WindowClosedCommand = new ( () => {
-				try
+			WindowClosedCommand = new DelegateCommand(OnWindowClosed);
+		}
+
+		/// <summary>
+		/// アプリケーション終了イベント
+		/// </summary>
+		private void OnWindowClosed()
+		{
+			try
+			{
+				// 一時フォルダを削除
+				if ( Directory.Exists(tempRootDirectory) )
 				{
-					// 一時フォルダを削除
-					if ( Directory.Exists(tempRootDirectory) )
-					{
-						Directory.Delete(tempRootDirectory, recursive: true);
-					}
+					Directory.Delete(tempRootDirectory, recursive: true);
 				}
-				catch (Exception)
-				{
-				}
-			} );
+			}
+			catch (Exception)
+			{
+			}
 		}
 
 		#endregion
