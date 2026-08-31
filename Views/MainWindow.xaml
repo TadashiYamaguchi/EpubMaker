@@ -7,6 +7,11 @@
 		xmlns:local="clr-namespace:EpubMaker"
 		mc:Ignorable="d"
 		Title="MainWindow" Height="450" Width="800">
+	<i:Interaction.Triggers>
+		<i:EventTrigger EventName="Closed">
+			<i:InvokeCommandAction Command="{Binding WindowClosedCommand}"/>
+		</i:EventTrigger>
+	</i:Interaction.Triggers>
 	<Grid Margin="15">
 		<Grid.RowDefinitions>
 			<!-- 巻リスト -->

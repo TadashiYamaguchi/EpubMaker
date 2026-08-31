@@ -8,6 +8,10 @@ namespace EpubMaker
 	{
 		#region MainWindowViewModel プロパティ
 
+		public DelegateCommand WindowClosedCommand { get; }
+
+		private readonly string tempRootDirectory = Path.Combine( Path.GetTempPath(), "EpubMaker" );
+
 		public ObservableCollectionEx<Volume> Volumes { get; } = [];
 
 		private Volume? selectedVolume = null;
@@ -43,7 +47,7 @@ namespace EpubMaker
 						else
 						{
 							// 一意な一次的フォルダを作成
-							string extractDirectory = Path.Combine( Path.GetTempPath(), "EpubMaker", Guid.NewGuid().ToString("N") );
+							string extractDirectory = Path.Combine( tempRootDirectory, Guid.NewGuid().ToString("N") );
 							Directory.CreateDirectory(extractDirectory);
 
 							// 巻名リストに反映
@@ -61,6 +65,25 @@ namespace EpubMaker
 		#endregion
 
 		#region MainWindowViewModel メソッド
+
+		public MainWindowViewModel()
+		{
+			// アプリケーション終了コマンド
+			WindowClosedCommand = new ( () => {
+				try
+				{
+					// 一時フォルダを削除
+					if ( Directory.Exists(tempRootDirectory) )
+					{
+						Directory.Delete(tempRootDirectory, recursive: true);
+					}
+				}
+				catch (Exception)
+				{
+				}
+			} );
+		}
+
 		#endregion
 	}
 }
