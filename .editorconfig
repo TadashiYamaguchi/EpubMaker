@@ -1,0 +1,4 @@
+root = true
+
+[*.{cs,xaml}]
+charset = utf-8-bom

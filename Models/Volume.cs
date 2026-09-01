@@ -1,27 +1,16 @@
-using System.IO;
-using System.Text;
-
-using SharpCompress.Archives;
+ï»¿using SharpCompress.Archives;
 using SharpCompress.Common;
 using SharpCompress.Readers;
+using System.Diagnostics;
+using System.IO;
+using System.IO.Compression;
+using System.Text;
 
 namespace EpubMaker
 {
 	public class Volume : BindableBase
 	{
-		#region Volume ƒvƒƒpƒeƒB
-
-		public enum volumeStatus
-		{
-			Unprocessed,	// –¢ˆ—
-			Extracting,		// ‰ğ“€’†
-			Scanning,		// ”’†ƒXƒLƒƒƒ“’†
-			Ready,			// ƒ`ƒFƒbƒN‘Ò‚¿
-			Checked,		// ƒ`ƒFƒbƒNŠ®—¹
-			Converting,		// EPUB•ÏŠ·’†
-			Completed,		// Š®—¹
-			Error			// ƒGƒ‰[
-		}
+		#region Volume ãƒ—ãƒ­ãƒ‘ãƒ†ã‚£
 
 		private string sourceFileName = string.Empty;
 
@@ -31,21 +20,33 @@ namespace EpubMaker
 		private string name = string.Empty;
 		public string Name { get => name; set => SetProperty(ref name, value); }
 
-		private volumeStatus status = volumeStatus.Unprocessed;
+		public enum VolumeStatus
+		{
+			Unprocessed,    // æœªå‡¦ç†
+			Extracting,     // è§£å‡ä¸­
+			Scanning,       // ç™½ç´™ã‚¹ã‚­ãƒ£ãƒ³ä¸­
+			Ready,          // ãƒã‚§ãƒƒã‚¯å¾…ã¡
+			Checked,        // ãƒã‚§ãƒƒã‚¯å®Œäº†
+			Converting,     // EPUBå¤‰æ›ä¸­
+			Completed,      // å®Œäº†
+			Error           // ã‚¨ãƒ©ãƒ¼
+		}
+
+		private VolumeStatus status = VolumeStatus.Unprocessed;
 		public string Status
 		{
 			get
 			{
 				return status switch
 				{
-					volumeStatus.Unprocessed =>	"–¢ˆ—",
-					volumeStatus.Extracting =>	"‰ğ“€’†",
-					volumeStatus.Scanning =>	"”’†ƒXƒLƒƒƒ“’†",
-					volumeStatus.Ready =>		"ƒ`ƒFƒbƒN‘Ò‚¿",
-					volumeStatus.Checked =>		"ƒ`ƒFƒbƒNŠ®—¹",
-					volumeStatus.Converting =>	"EPUB•ÏŠ·’†",
-					volumeStatus.Completed =>	"Š®—¹",
-					volumeStatus.Error =>		"ƒGƒ‰[",
+					VolumeStatus.Unprocessed =>	"æœªå‡¦ç†",
+					VolumeStatus.Extracting =>	"è§£å‡ä¸­",
+					VolumeStatus.Scanning =>	"ç™½ç´™ã‚¹ã‚­ãƒ£ãƒ³ä¸­",
+					VolumeStatus.Ready =>		"ãƒã‚§ãƒƒã‚¯å¾…ã¡",
+					VolumeStatus.Checked =>		"ãƒã‚§ãƒƒã‚¯å®Œäº†",
+					VolumeStatus.Converting =>	"EPUBå¤‰æ›ä¸­",
+					VolumeStatus.Completed =>	"å®Œäº†",
+					VolumeStatus.Error =>		"ã‚¨ãƒ©ãƒ¼",
 					_ => throw new ArgumentOutOfRangeException()
 				};
 			}
@@ -58,62 +59,253 @@ namespace EpubMaker
 
 		public ObservableCollectionEx<Page> Pages { get; } = [];
 
+		public enum ReadingDirections
+		{
+			RightToLeft,    // æ¼«ç”»æƒ³å®š(ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆ å³é–‹ã)
+			LeftToRight
+		}
+
+		private ReadingDirections readingDirection = ReadingDirections.RightToLeft;
+		public ReadingDirections ReadingDirection { get => readingDirection; set => SetProperty(ref readingDirection, value); }
+		private string ReadingDirectionValue => readingDirection == ReadingDirections.RightToLeft ? "rtl" : "ltr";
+
 		private static readonly string[] ImageExtensions = { ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tiff", ".webp" };
+
+		private static readonly UTF8Encoding Utf8NoBom = new UTF8Encoding(false);
 
 		#endregion
 
-		#region Volume ƒƒ\ƒbƒh
+		#region Volume ãƒ¡ã‚½ãƒƒãƒ‰
 
 		static Volume()
 		{
-			// SharpCompress‚Ì•¶šƒR[ƒh‚ğShift_JIS‚Éİ’è
+			// SharpCompressã®æ–‡å­—ã‚³ãƒ¼ãƒ‰ã‚’Shift_JISã«è¨­å®š
 			Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 		}
 
+		/// <summary>
+		/// ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+		/// </summary>
+		/// <param name="fileName"></param>
 		public Volume(string fileName)
 		{
 			sourceFileName = fileName;
 			Name = Path.GetFileNameWithoutExtension(fileName);
-			status = volumeStatus.Unprocessed;
+			status = VolumeStatus.Unprocessed;
 		}
 
+		/// <summary>
+		/// å·»ãƒªã‚¹ãƒˆã‚’ç”Ÿæˆ
+		/// </summary>
+		/// <param name="extractDirectory"></param>
 		public async Task LoadAsync(string extractDirectory)
 		{
-			SetProperty( ref status, volumeStatus.Extracting, nameof(Status) );
+			SetProperty( ref status, VolumeStatus.Extracting, nameof(Status) );
 
 			try
 			{
 				List<Page> pages = await Task.Run( () =>
 				{
-					// ƒA[ƒJƒCƒu‚ğŠJ‚¢‚Ä‘SƒGƒ“ƒgƒŠ‚ğ“WŠJ
-					using ( IArchive archive = ArchiveFactory.OpenArchive(sourceFileName, new ReaderOptions { ArchiveEncoding = new ArchiveEncoding { Default = Encoding.GetEncoding(932) } } ) )
+					if ( !Directory.Exists(sourceFileName) )
 					{
-						foreach (IArchiveEntry entryFile in archive.Entries)
+						// ã‚¢ãƒ¼ã‚«ã‚¤ãƒ–ã‚’é–‹ã„ã¦å…¨ã‚¨ãƒ³ãƒˆãƒªã‚’å±•é–‹
+						using ( IArchive archive = ArchiveFactory.OpenArchive(sourceFileName, new ReaderOptions { ArchiveEncoding = new ArchiveEncoding { Default = Encoding.GetEncoding(932) } } ) )
 						{
-							if ( !entryFile.IsDirectory )
+							foreach (IArchiveEntry entryFile in archive.Entries)
 							{
-								entryFile.WriteToDirectory(extractDirectory, new ExtractionOptions
+								if ( !entryFile.IsDirectory )
 								{
-									ExtractFullPath = true,
-									Overwrite = true
-								} );
+									entryFile.WriteToDirectory(extractDirectory, new ExtractionOptions
+									{
+										ExtractFullPath = true,
+										Overwrite = true
+									} );
+								}
 							}
 						}
-
-						return Directory.EnumerateFiles(extractDirectory, "*.*", SearchOption.AllDirectories).Where( f => ImageExtensions.Contains( Path.GetExtension(f).ToLowerInvariant() ) ).Select( f => new Page(f) ).ToList();
 					}
+					return Directory.EnumerateFiles(extractDirectory, "*.*", SearchOption.AllDirectories).Where( f => ImageExtensions.Contains( Path.GetExtension(f).ToLowerInvariant() ) ).Select( f => new Page(f) ).ToList();
 				} );
 
 				Count = pages.Count;
 				Pages.Clear();
 				Pages.AddRange(pages);
 
-				SetProperty( ref status, volumeStatus.Ready, nameof(Status) );
+				SetProperty( ref status, VolumeStatus.Ready, nameof(Status) );
 			}
-			catch (Exception)
+			catch (Exception ex)
 			{
-				SetProperty( ref status, volumeStatus.Error, nameof(Status) );
+				SetProperty( ref status, VolumeStatus.Error, nameof(Status) );
+
+				Debug.WriteLine(ex);
 			}
+		}
+
+		/// <summary>
+		/// Epubå½¢å¼ã«å¤‰æ›
+		/// </summary>
+		/// <param name="outputDirectory"></param>
+		public async Task ConvertToEpubAsync(string outputDirectory)
+		{
+			SetProperty( ref status, VolumeStatus.Converting, nameof(Status) );
+
+			try
+			{
+				List<Page> targetPages = Pages.Where( p => !p.IsExcluded ).ToList();
+				string epubFileName = Path.Combine(outputDirectory, OutputFileName);
+
+				await Task.Run( () => BuildEpub(epubFileName, targetPages) );
+
+				SetProperty( ref status, VolumeStatus.Completed, nameof(Status) );
+			}
+			catch (Exception ex)
+			{
+				SetProperty( ref status, VolumeStatus.Error, nameof(Status) );
+				Debug.WriteLine(ex);
+			}
+		}
+
+		/// <summary>
+		/// Epubã‚’ç”Ÿæˆ
+		/// </summary>
+		/// <param name="epubFileName"></param>
+		/// <param name="pages"></param>
+		private void BuildEpub(string epubFileName, List<Page> pages)
+		{
+			using (FileStream fileStream = new (epubFileName, FileMode.Create) )
+			using ( ZipArchive archive = new (fileStream, ZipArchiveMode.Create) )
+			{
+				// mimetypeã¯ç„¡åœ§ç¸®ãƒ»å¿…ãšå…ˆé ­ã‚¨ãƒ³ãƒˆãƒª(EPUBä»•æ§˜ã®å¿…é ˆãƒ«ãƒ¼ãƒ«)
+				ZipArchiveEntry mimetypeEntry = archive.CreateEntry("mimetype", CompressionLevel.NoCompression);
+				using ( StreamWriter writer = new ( mimetypeEntry.Open(), Utf8NoBom ) )
+				{
+					writer.Write("application/epub+zip");
+				}
+
+				WriteTextEntry( archive, "META-INF/container.xml", BuildContainerXml() );
+				WriteTextEntry( archive, "OEBPS/content.opf", BuildContentOpf(pages) );
+				WriteTextEntry( archive, "OEBPS/nav.xhtml", BuildNavXhtml() );
+
+				for (int i = 0; i < pages.Count; i++)
+				{
+					string pageNumber = (i + 1).ToString("D4");
+					string extension = Path.GetExtension(pages[i].ImagePath);
+
+					// ç”»åƒãƒ•ã‚¡ã‚¤ãƒ«ã‚’è¿½åŠ 
+					archive.CreateEntryFromFile(pages[i].ImagePath, $"OEBPS/images/page{pageNumber}{extension}");
+					// XHTMLãƒ•ã‚¡ã‚¤ãƒ«ã‚’è¿½åŠ 
+					WriteTextEntry( archive, $"OEBPS/text/page{pageNumber}.xhtml", BuildPageXhtml(pageNumber, extension) );
+				}
+			}
+		}
+
+		private void WriteTextEntry(ZipArchive archive, string entryName, string content)
+		{
+			ZipArchiveEntry entry = archive.CreateEntry(entryName, CompressionLevel.Optimal);
+			using ( StreamWriter writer = new ( entry.Open(), Utf8NoBom ) )
+			{
+				writer.Write(content);
+			}
+		}
+
+		private static string BuildContainerXml()
+		{
+			return
+				"""
+				<?xml version="1.0" encoding="UTF-8"?>
+				<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+				  <rootfiles>
+					<rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+				  </rootfiles>
+				</container>
+				""";
+		}
+
+		private string BuildContentOpf(List<Page> pages)
+		{
+			StringBuilder manifest = new ();
+			StringBuilder spine = new ();
+
+			for (int i = 0; i < pages.Count; i++)
+			{
+				string pageNumber = (i + 1).ToString("D4");
+				string extension = Path.GetExtension(pages[i].ImagePath).ToLowerInvariant();
+				string mediaType = extension switch
+				{
+					".jpg" or ".jpeg" => "image/jpeg",
+					".png" => "image/png",
+					".gif" => "image/gif",
+					".bmp" => "image/bmp",
+					".tiff" => "image/tiff",
+					".webp" => "image/webp",
+					_ => "application/octet-stream"
+				};
+				string coverProperty = (i == 0) ? " properties=\"cover-image\"" : "";
+
+				manifest.AppendLine($"""		<item id="img{pageNumber}" href="images/page{pageNumber}{extension}" media-type="{mediaType}"{coverProperty}/>""");
+				manifest.AppendLine($"""		<item id="text{pageNumber}" href="text/page{pageNumber}.xhtml" media-type="application/xhtml+xml"/>""");
+				spine.AppendLine($"""		<itemref idref="text{pageNumber}"/>""");
+			}
+
+			return
+				$"""
+				<?xml version="1.0" encoding="UTF-8"?>
+				<package version="3.0" unique-identifier="BookId" xmlns="http://www.idpf.org/2007/opf">
+					<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+						<dc:identifier id="BookId">urn:uuid:{Guid.NewGuid()}</dc:identifier>
+						<dc:title>{name}</dc:title>
+						<dc:language>ja</dc:language>
+						<meta property="rendition:layout">pre-paginated</meta>
+						<meta property="rendition:orientation">auto</meta>
+						<meta property="rendition:spread">auto</meta>
+					</metadata>
+					<manifest>
+						<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+						{manifest}
+					</manifest>
+					<spine page-progression-direction="{ReadingDirectionValue}">
+						{spine}
+					</spine>
+				</package>
+				""";
+		}
+
+		private static string BuildNavXhtml()
+		{
+			return
+				"""
+				<?xml version="1.0" encoding="UTF-8"?>
+				<!DOCTYPE html>
+				<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+					<head><title>Navigation</title></head>
+					<body>
+					  <nav epub:type="toc" id="toc">
+						  <ol>
+							  <li><a href="text/page0001.xhtml">å…ˆé ­</a></li>
+						  </ol>
+					  </nav>
+					</body>
+				</html>
+				""";
+		}
+
+		private static string BuildPageXhtml(string pageNumber, string extension)
+		{
+			return
+				$$"""
+				<?xml version="1.0" encoding="UTF-8"?>
+				<!DOCTYPE html>
+				<html xmlns="http://www.w3.org/1999/xhtml">
+				  <head>
+					<meta charset="UTF-8"/>
+					<title>page{{pageNumber}}</title>
+					<style>html,body{margin:0;padding:0;} img{width:100%;height:100%;}</style>
+				  </head>
+				  <body>
+					<img src="../images/page{{pageNumber}}{{extension}}" alt=""/>
+				  </body>
+				</html>
+				""";
 		}
 
 		#endregion

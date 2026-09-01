@@ -6,7 +6,7 @@
 		xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 		xmlns:local="clr-namespace:EpubMaker"
 		mc:Ignorable="d"
-		Title="MainWindow" Height="450" Width="800">
+		Title="EpubMaker" Height="450" Width="800">
 	<i:Interaction.Triggers>
 		<i:EventTrigger EventName="Closed">
 			<i:InvokeCommandAction Command="{Binding WindowClosedCommand}"/>
@@ -34,8 +34,7 @@
 					<GridViewColumn Header="選択" Width="50">
 						<GridViewColumn.CellTemplate>
 							<DataTemplate>
-								<CheckBox IsChecked="{Binding IsTarget, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
-									HorizontalAlignment="Center"/>
+								<CheckBox IsChecked="{Binding IsTarget, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center"/>
 							</DataTemplate>
 						</GridViewColumn.CellTemplate>
 					</GridViewColumn>
@@ -44,8 +43,7 @@
 					<GridViewColumn Header="巻名 (クリックして変更可能)" Width="230">
 						<GridViewColumn.CellTemplate>
 							<DataTemplate>
-								<TextBox Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
-									BorderThickness="0" Background="Transparent" VerticalAlignment="Center"/>
+								<TextBox Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" BorderThickness="0" Background="Transparent" VerticalAlignment="Center"/>
 							</DataTemplate>
 						</GridViewColumn.CellTemplate>
 					</GridViewColumn>
@@ -76,7 +74,7 @@
 							<!-- トグルボタンでクリック時の除外状態を管理 -->
 							<ToggleButton IsChecked="{Binding IsExcluded, Mode=TwoWay}" Margin="5" Padding="0" BorderThickness="1">
 								<StackPanel Width="90" Height="130" Background="#FAFAFA">
-									<Image Source="{Binding ImagePath}" Width="90" Height="110" Stretch="Uniform"/>
+									<Image Source="{Binding Thumbnail}" Width="90" Height="110" Stretch="Uniform"/>
 									<TextBlock Text="{Binding FileName}" FontSize="10" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
 								</StackPanel>
 							</ToggleButton>
@@ -97,14 +95,11 @@
 
 			<TextBlock Grid.Column="0" Text="出力先フォルダ:" VerticalAlignment="Center" Margin="0,0,10,0"/>
 
-			<TextBox Grid.Column="1" Text="{Binding OutputDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
-				VerticalAlignment="Center" Height="28"/>
+			<TextBox Grid.Column="1" Text="{Binding OutputDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" VerticalContentAlignment="Center" Height="28"/>
+			
+			<Button Grid.Column="2" Content="参照..." Command="{Binding BrowseDirectoryCommand}" Width="60" Height="28" Margin="5,0"/>
 
-			<Button Grid.Column="2" Content="参照..." Command="{Binding BrowseDirectoryCommand}" 
-			Width="60" Height="28" Margin="5,0"/>
-
-			<Button Grid.Column="3" Content="変換" Command="{Binding StartConversionCommand}" 
-			Height="30" FontWeight="Bold" Background="#007ACC" Foreground="White"/>
+			<Button Grid.Column="3" Content="変換" Command="{Binding StartConversionCommand}" Height="30" FontWeight="Bold" Background="#007ACC" Foreground="White"/>
 		</Grid>
 	</Grid>
 </Window>

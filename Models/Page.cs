@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -6,26 +6,38 @@ namespace EpubMaker
 {
 	public class Page : BindableBase
 	{
-		#region Page �v���p�e�B
+		#region Page プロパティ
+
+		private string imagePath = string.Empty;
+		public string ImagePath { get => imagePath; set => SetProperty(ref imagePath, value); }
 
 		private string fileName = string.Empty;
 		public string FileName { get => fileName; set => SetProperty(ref fileName, value); }
 
-		public ImageSource Image { get; }
+		public ImageSource Thumbnail { get; }
 
-		private bool isExcluded = true;
+		private bool isExcluded = false;
 		public bool IsExcluded { get => isExcluded; set => SetProperty(ref isExcluded, value); }
 
 		#endregion
 
-		#region Page ���\�b�h
+		#region Page メソッド
 
+		/// <summary>
+		/// コンストラクタ
+		/// </summary>
+		/// <param name="fileName"></param>
 		public Page(string fileName)
 		{
+			ImagePath = fileName;
 			FileName = Path.GetFileName(fileName);
-			Image = CreateImage(fileName);
+			Thumbnail = CreateImage(fileName);
 		}
 
+		/// <summary>
+		/// 画像を生成
+		/// </summary>
+		/// <param name="fileName"></param>
 		private static BitmapImage CreateImage(string fileName)
 		{
 			BitmapImage bitmapImage = new ();

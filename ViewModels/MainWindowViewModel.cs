@@ -1,15 +1,16 @@
-using System.IO;
-
-using System.Diagnostics;
-using System.Net.Http.Headers;
+ï»¿using System.IO;
 
 namespace EpubMaker
 {
 	public class MainWindowViewModel : BindableBase
 	{
-		#region MainWindowViewModel ƒvƒƒpƒeƒB
+		#region MainWindowViewModel ãƒ—ãƒ­ãƒ‘ãƒ†ã‚£
+
+		private readonly IFolderBrowserService folderBrowserService;
 
 		public DelegateCommand WindowClosedCommand { get; }
+		public DelegateCommand BrowseDirectoryCommand { get; }
+		public DelegateCommand StartConversionCommand { get; }
 
 		private readonly string tempRootDirectory = Path.Combine( Path.GetTempPath(), "EpubMaker" );
 
@@ -18,71 +19,90 @@ namespace EpubMaker
 		private Volume? selectedVolume = null;
 		public Volume? SelectedVolume { get => selectedVolume; set => SetProperty(ref selectedVolume, value); }
 
+		private string outputDirectory = string.Empty;
+		public string OutputDirectory { get => outputDirectory; set => SetProperty(ref outputDirectory, value); }
+
+		private bool isConverting = false;
+
 		public string[] DropFiles
 		{
 			set
 			{
 				if (value != null)
 				{
+					Action<string, string> addVolume = (sourceFile, extractDirectory) =>
+					{
+						// å·»ãƒªã‚¹ãƒˆã‚’ç”Ÿæˆ
+						Volume volume = new (sourceFile);
+						Volumes.Add(volume);
+						// å·»ã®å±•é–‹å‡¦ç†ã‚’éåŒæœŸã§é–‹å§‹
+						_ = volume.LoadAsync(extractDirectory);
+					};
+
 					foreach (string fileName in value)
 					{
+						// ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªã®å ´åˆ
 						if ( Directory.Exists(fileName) )
 						{
 							string[] subDirectories = Directory.GetDirectories(fileName);
 
-							// qƒfƒBƒŒƒNƒgƒŠ‚ª‚ ‚éê‡
+							// å­ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªãŒã‚ã‚‹å ´åˆ
 							if (subDirectories.Length > 0)
 							{
 								foreach (string subDirectory in subDirectories)
 								{
-									Debug.WriteLine($"ŠªƒtƒHƒ‹ƒ_: {subDirectory}");
+									addVolume(subDirectory, subDirectory);
 								}
 							}
-							// qƒfƒBƒŒƒNƒgƒŠ‚ª‚È‚¢ê‡(©g‚ªŠªƒfƒBƒŒƒNƒgƒŠ)
+							// å­ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªãŒãªã„å ´åˆ(è‡ªèº«ãŒå·»ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒª)
 							else
 							{
-								Debug.WriteLine($"ŠªƒtƒHƒ‹ƒ_: {fileName}");
+								addVolume(fileName, fileName);
 							}
 						}
-						// ƒtƒ@ƒCƒ‹ê‡(©g‚ªŠªƒfƒBƒŒƒNƒgƒŠ)
+						// ãƒ•ã‚¡ã‚¤ãƒ«å ´åˆ
 						else
 						{
-							// ˆêˆÓ‚ÈˆêŸ“IƒtƒHƒ‹ƒ_‚ğì¬
+							// ä¸€æ„ãªä¸€æ¬¡çš„ãƒ•ã‚©ãƒ«ãƒ€ã‚’ä½œæˆ
 							string extractDirectory = Path.Combine( tempRootDirectory, Guid.NewGuid().ToString("N") );
 							Directory.CreateDirectory(extractDirectory);
 
-							// Šª–¼ƒŠƒXƒg‚É”½‰f
-							Volume volume = new (fileName);
-							Volumes.Add(volume);
-
-							// Šª‚Ì“WŠJˆ—‚ğ”ñ“¯Šú‚ÅŠJn
-							_ = volume.LoadAsync(extractDirectory);
+							addVolume(fileName, extractDirectory);
 						}
 					}
+
+					DelegateCommand.ReiseCanExecuteChange();
 				}
 			}
 		}
 
 		#endregion
 
-		#region MainWindowViewModel ƒƒ\ƒbƒh
+		#region MainWindowViewModel ãƒ¡ã‚½ãƒƒãƒ‰
 
 		// <summary>
-		// ƒRƒ“ƒXƒgƒ‰ƒNƒ^
+		// ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
 		// </summary>
-		public MainWindowViewModel()
+		public MainWindowViewModel(IFolderBrowserService folderBrowserService)
 		{
-			WindowClosedCommand = new DelegateCommand(OnWindowClosed);
+			this.folderBrowserService = folderBrowserService;
+			WindowClosedCommand = new (OnWindowClosed);
+			BrowseDirectoryCommand = new ( () =>
+			{
+				OutputDirectory = folderBrowserService.BrowseFolder();
+				DelegateCommand.ReiseCanExecuteChange();
+			} );
+			StartConversionCommand = new (OnStartConversion, () => Volumes.Count > 0 && !isConverting && !string.IsNullOrWhiteSpace(outputDirectory) );
 		}
 
 		/// <summary>
-		/// ƒAƒvƒŠƒP[ƒVƒ‡ƒ“I—¹ƒCƒxƒ“ƒg
+		/// ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³çµ‚äº†ã‚¤ãƒ™ãƒ³ãƒˆ
 		/// </summary>
 		private void OnWindowClosed()
 		{
 			try
 			{
-				// ˆêƒtƒHƒ‹ƒ_‚ğíœ
+				// ä¸€æ™‚ãƒ•ã‚©ãƒ«ãƒ€ã‚’å‰Šé™¤
 				if ( Directory.Exists(tempRootDirectory) )
 				{
 					Directory.Delete(tempRootDirectory, recursive: true);
@@ -91,6 +111,23 @@ namespace EpubMaker
 			catch (Exception)
 			{
 			}
+		}
+
+		/// <summary>
+		/// å¤‰æ›é–‹å§‹ã‚¤ãƒ™ãƒ³ãƒˆ
+		/// </summary>
+		private async void OnStartConversion()
+		{
+			isConverting = true;
+			DelegateCommand.ReiseCanExecuteChange();
+
+			foreach (Volume volume in Volumes.Where(v => v.IsTarget) )
+			{
+				await volume.ConvertToEpubAsync(OutputDirectory);
+			}
+
+			isConverting = false;
+			DelegateCommand.ReiseCanExecuteChange();
 		}
 
 		#endregion
