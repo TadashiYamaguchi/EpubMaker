@@ -28,6 +28,18 @@
 				<local:DragAndDropBehavior DropFiles="{Binding DropFiles, Mode=OneWayToSource}" AllowedExtensions=".zip,.rar"/>
 			</i:Interaction.Behaviors>
 
+			<ListView.ItemContainerStyle>
+				<Style TargetType="ListViewItem">
+					<Setter Property="ContextMenu">
+						<Setter.Value>
+							<ContextMenu>
+								<MenuItem Header="白紙ページを自動除外" Command="{Binding PlacementTarget.DataContext.AutoExcludeBlankPagesCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+							</ContextMenu>
+						</Setter.Value>
+					</Setter>
+				</Style>
+			</ListView.ItemContainerStyle>
+
 			<ListView.View>
 				<GridView>
 					<!-- 出力対象フラグ -->
@@ -43,7 +55,20 @@
 					<GridViewColumn Header="巻名 (クリックして変更可能)" Width="230">
 						<GridViewColumn.CellTemplate>
 							<DataTemplate>
-								<TextBox Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" BorderThickness="0" Background="Transparent" VerticalAlignment="Center"/>
+								<TextBox Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center">
+									<TextBox.Style>
+										<Style TargetType="TextBox">
+											<Setter Property="Background" Value="Transparent"/>
+											<Setter Property="BorderBrush" Value="Transparent"/>
+											<Style.Triggers>
+												<Trigger Property="IsFocused" Value="True">
+													<Setter Property="Background" Value="White"/>
+													<Setter Property="BorderBrush" Value="#007ACC"/>
+												</Trigger>
+											</Style.Triggers>
+										</Style>
+									</TextBox.Style>
+								</TextBox>
 							</DataTemplate>
 						</GridViewColumn.CellTemplate>
 					</GridViewColumn>
@@ -73,10 +98,26 @@
 						<DataTemplate>
 							<!-- トグルボタンでクリック時の除外状態を管理 -->
 							<ToggleButton IsChecked="{Binding IsExcluded, Mode=TwoWay}" Margin="5" Padding="0" BorderThickness="1">
-								<StackPanel Width="90" Height="130" Background="#FAFAFA">
-									<Image Source="{Binding Thumbnail}" Width="90" Height="110" Stretch="Uniform"/>
-									<TextBlock Text="{Binding FileName}" FontSize="10" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-								</StackPanel>
+								<Grid Width="90" Height="130">
+									<StackPanel Background="#FAFAFA">
+										<Image Source="{Binding Thumbnail}" Width="90" Height="110" Stretch="Uniform"/>
+										<TextBlock Text="{Binding FileName}" FontSize="10" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+									</StackPanel>
+									<!-- 除外中の時だけ表示するオーバーレイ-->
+									<Grid Background="#AAFFFFFF">
+										<Grid.Style>
+											<Style TargetType="Grid">
+												<Setter Property="Visibility" Value="Collapsed"/>
+												<Style.Triggers>
+													<DataTrigger Binding="{Binding IsExcluded}" Value="True">
+														<Setter Property="Visibility" Value="Visible"/>
+													</DataTrigger>
+												</Style.Triggers>
+											</Style>
+										</Grid.Style>
+										<TextBlock Text="除外" Foreground="Red" FontWeight="Bold" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+									</Grid>
+								</Grid>
 							</ToggleButton>
 						</DataTemplate>
 					</ItemsControl.ItemTemplate>

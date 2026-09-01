@@ -5,12 +5,16 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace EpubMaker
 {
 	public class Volume : BindableBase
 	{
 		#region Volume プロパティ
+
+		public DelegateCommand AutoExcludeBlankPagesCommand { get; }
 
 		private string sourceFileName = string.Empty;
 
@@ -92,6 +96,9 @@ namespace EpubMaker
 			sourceFileName = fileName;
 			Name = Path.GetFileNameWithoutExtension(fileName);
 			status = VolumeStatus.Unprocessed;
+
+			AutoExcludeBlankPagesCommand = new (async () => await AutoExcludeBlankPagesAsync() );
+
 		}
 
 		/// <summary>
@@ -163,6 +170,56 @@ namespace EpubMaker
 				SetProperty( ref status, VolumeStatus.Error, nameof(Status) );
 				Debug.WriteLine(ex);
 			}
+		}
+
+		/// <summary>
+		/// 自動で空白ページを除外
+		/// </summary>
+		private async Task AutoExcludeBlankPagesAsync()
+		{
+			List<Page> targets = Pages.ToList();
+
+			bool[] isBlanks = await Task.Run( () =>
+			{
+				bool[] results = new bool[targets.Count];
+				for (int i = 0; i < targets.Count; i++)
+				{
+					results[i] = IsBlankPage(targets[i].Thumbnail);
+				}
+				return results;
+			} );
+
+			// 判定結果を反映
+			for (int i = 0; i < targets.Count; i++)
+			{
+				targets[i].IsExcluded = isBlanks[i];
+			}
+		}
+
+		/// <summary>
+		/// 画像が空白ページかどうかを判定
+		/// </summary>
+		/// <param name="imageSource"></param>
+		/// <param name="whiteThreshold"></param>
+		/// <param name="blankRatioThreshold"></param>
+		private static bool IsBlankPage(ImageSource imageSource, byte whiteThreshold = 240, double blankRatioThreshold = 0.98)
+		{
+			bool result = false;
+
+			if (imageSource is BitmapSource bitmapSource)
+			{
+				FormatConvertedBitmap grayBitmap = new (bitmapSource, PixelFormats.Gray8, null, 0);
+				int width = grayBitmap.PixelWidth;
+				int height = grayBitmap.PixelHeight;
+				byte[] pixels = new byte[width * height];
+				grayBitmap.CopyPixels(pixels, width, 0);
+
+				int whiteCount = pixels.Count( p => p >= whiteThreshold );
+				double whiteRatio = (double)whiteCount / pixels.Length;
+				result = whiteRatio >= blankRatioThreshold;
+			}
+
+			return result;
 		}
 
 		/// <summary>
