@@ -4,14 +4,20 @@
 		xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
 		xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
 		xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+		xmlns:g="clr-namespace:"
 		xmlns:local="clr-namespace:EpubMaker"
 		mc:Ignorable="d"
 		Title="EpubMaker" Height="450" Width="800">
+	<Window.Resources>
+		<g:EnumToBooleanConverter x:Key="EnumToBooleanConverter"/>
+	</Window.Resources>
+
 	<i:Interaction.Triggers>
 		<i:EventTrigger EventName="Closed">
 			<i:InvokeCommandAction Command="{Binding WindowClosedCommand}"/>
 		</i:EventTrigger>
 	</i:Interaction.Triggers>
+
 	<Grid Margin="15">
 		<Grid.RowDefinitions>
 			<!-- 巻リスト -->
@@ -33,6 +39,31 @@
 					<Setter Property="ContextMenu">
 						<Setter.Value>
 							<ContextMenu>
+								<MenuItem Header="出力フォーマット">
+									<MenuItem Header="JPGに変換" IsCheckable="True" Command="{Binding PlacementTarget.DataContext.OutputImageFormatCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="{x:Static local:Volume+OutputImageFormats.Jpg}">
+										<MenuItem.IsChecked>
+											<Binding Path="PlacementTarget.DataContext.OutputImageFormat" RelativeSource="{RelativeSource AncestorType=ContextMenu}" Converter="{StaticResource EnumToBooleanConverter}" ConverterParameter="{x:Static local:Volume+OutputImageFormats.Jpg}"/>
+										</MenuItem.IsChecked>
+									</MenuItem>
+									<MenuItem Header="WebPに変換" IsCheckable="True" Command="{Binding PlacementTarget.DataContext.OutputImageFormatCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="{x:Static local:Volume+OutputImageFormats.WebP}">
+										<MenuItem.IsChecked>
+											<Binding Path="PlacementTarget.DataContext.OutputImageFormat" RelativeSource="{RelativeSource AncestorType=ContextMenu}" Converter="{StaticResource EnumToBooleanConverter}" ConverterParameter="{x:Static local:Volume+OutputImageFormats.WebP}"/>
+										</MenuItem.IsChecked>
+									</MenuItem>
+								</MenuItem>
+								<MenuItem Header="読み進め方向">
+									<MenuItem Header="右開き(マンガ)" IsCheckable="True" Command="{Binding PlacementTarget.DataContext.ReadingDirectionCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"	 CommandParameter="{x:Static local:Volume+ReadingDirections.RightToLeft}">
+										<MenuItem.IsChecked>
+											<Binding Path="PlacementTarget.DataContext.ReadingDirection" RelativeSource="{RelativeSource AncestorType=ContextMenu}" Converter="{StaticResource EnumToBooleanConverter}" ConverterParameter="{x:Static local:Volume+ReadingDirections.RightToLeft}"/>
+										</MenuItem.IsChecked>
+									</MenuItem>
+									<MenuItem Header="左開き" IsCheckable="True" Command="{Binding PlacementTarget.DataContext.ReadingDirectionCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="{x:Static local:Volume+ReadingDirections.LeftToRight}">
+										<MenuItem.IsChecked>
+											<Binding Path="PlacementTarget.DataContext.ReadingDirection" RelativeSource="{RelativeSource AncestorType=ContextMenu}" Converter="{StaticResource EnumToBooleanConverter}" ConverterParameter="{x:Static local:Volume+ReadingDirections.LeftToRight}"/>
+										</MenuItem.IsChecked>
+									</MenuItem>
+								</MenuItem>
+								<Separator/>
 								<MenuItem Header="白紙ページを自動除外" Command="{Binding PlacementTarget.DataContext.AutoExcludeBlankPagesCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
 							</ContextMenu>
 						</Setter.Value>
@@ -98,6 +129,11 @@
 						<DataTemplate>
 							<!-- トグルボタンでクリック時の除外状態を管理 -->
 							<ToggleButton IsChecked="{Binding IsExcluded, Mode=TwoWay}" Margin="5" Padding="0" BorderThickness="1">
+								<i:Interaction.Triggers>
+									<i:EventTrigger EventName="MouseDoubleClick">
+										<i:InvokeCommandAction Command="{Binding OpenImageCommand}"/>
+									</i:EventTrigger>
+								</i:Interaction.Triggers>
 								<Grid Width="90" Height="130">
 									<StackPanel Background="#FAFAFA">
 										<Image Source="{Binding Thumbnail}" Width="90" Height="110" Stretch="Uniform"/>

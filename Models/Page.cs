@@ -1,12 +1,14 @@
-﻿using System.IO;
+﻿using System.Diagnostics;
+using System.IO;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 
 namespace EpubMaker
 {
 	public class Page : BindableBase
 	{
 		#region Page プロパティ
+
+		public DelegateCommand OpenImageCommand { get; }
 
 		private string imagePath = string.Empty;
 		public string ImagePath { get => imagePath; set => SetProperty(ref imagePath, value); }
@@ -29,25 +31,26 @@ namespace EpubMaker
 		/// <param name="fileName"></param>
 		public Page(string fileName)
 		{
+			OpenImageCommand = new (OnOpenImage);
+
 			ImagePath = fileName;
 			FileName = Path.GetFileName(fileName);
-			Thumbnail = CreateImage(fileName);
+			Thumbnail = ImageLoader.LoadImage(fileName, decodePixelWidth: 120);
 		}
 
 		/// <summary>
-		/// 画像を生成
+		/// 画像をビューアで表示
 		/// </summary>
-		/// <param name="fileName"></param>
-		private static BitmapImage CreateImage(string fileName)
+		private void OnOpenImage()
 		{
-			BitmapImage bitmapImage = new ();
-			bitmapImage.BeginInit();
-			bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
-			bitmapImage.DecodePixelWidth = 120; // Set the desired width for the thumbnail
-			bitmapImage.UriSource = new Uri(fileName);
-			bitmapImage.EndInit();
-			bitmapImage.Freeze(); // Freeze the image to make it cross-thread accessible
-			return bitmapImage;
+			try
+			{
+				Process.Start(new ProcessStartInfo(imagePath) { UseShellExecute = true });
+			}
+			catch (Exception ex)
+			{
+				Debug.WriteLine(ex);
+			}
 		}
 
 		#endregion

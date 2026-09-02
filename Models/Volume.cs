@@ -14,15 +14,21 @@ namespace EpubMaker
 	{
 		#region Volume プロパティ
 
+		public DelegateCommand<OutputImageFormats> OutputImageFormatCommand { get; }
+		public DelegateCommand<ReadingDirections> ReadingDirectionCommand { get; }
 		public DelegateCommand AutoExcludeBlankPagesCommand { get; }
 
 		private string sourceFileName = string.Empty;
-
-		private bool isTarget = true;
-		public bool IsTarget { get => isTarget; set => SetProperty(ref isTarget, value); }
+		public ObservableCollectionEx<Page> Pages { get; } = [];
 
 		private string name = string.Empty;
 		public string Name { get => name; set => SetProperty(ref name, value); }
+
+		private int count = 0;
+		public int Count { get => count; set => SetProperty(ref count, value); }
+
+		private bool isTarget = true;
+		public bool IsTarget { get => isTarget; set => SetProperty(ref isTarget, value); }
 
 		public enum VolumeStatus
 		{
@@ -56,12 +62,16 @@ namespace EpubMaker
 			}
 		}
 
-		private int count = 0;
-		public int Count { get => count; set => SetProperty(ref count, value); }
-
 		public string OutputFileName => $"{name}.epub";
 
-		public ObservableCollectionEx<Page> Pages { get; } = [];
+		public enum OutputImageFormats
+		{
+			Jpg,	//(デフォルト)
+			WebP
+		}
+		private OutputImageFormats outputImageFormat = OutputImageFormats.Jpg;
+		public OutputImageFormats OutputImageFormat { get => outputImageFormat; set => SetProperty(ref outputImageFormat, value); }
+
 
 		public enum ReadingDirections
 		{
@@ -73,7 +83,7 @@ namespace EpubMaker
 		public ReadingDirections ReadingDirection { get => readingDirection; set => SetProperty(ref readingDirection, value); }
 		private string ReadingDirectionValue => readingDirection == ReadingDirections.RightToLeft ? "rtl" : "ltr";
 
-		private static readonly string[] ImageExtensions = { ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp" };
+		private static readonly string[] ImageExtensions = { ".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".gif", ".webp" };
 
 		private static readonly UTF8Encoding Utf8NoBom = new UTF8Encoding(false);
 
@@ -97,8 +107,9 @@ namespace EpubMaker
 			Name = Path.GetFileNameWithoutExtension(fileName);
 			status = VolumeStatus.Unprocessed;
 
-			AutoExcludeBlankPagesCommand = new (async () => await AutoExcludeBlankPagesAsync() );
-
+			OutputImageFormatCommand = new (format => OutputImageFormat = format);
+			ReadingDirectionCommand = new (direction => ReadingDirection = direction);
+			AutoExcludeBlankPagesCommand = new ( async () => await AutoExcludeBlankPagesAsync() );
 		}
 
 		/// <summary>
@@ -222,6 +233,16 @@ namespace EpubMaker
 			return result;
 		}
 
+		private string OutputExtension(string fileName)
+		{
+			string sourceExtension = Path.GetExtension(fileName).ToLowerInvariant();
+			string targetExtension = outputImageFormat == OutputImageFormats.WebP ? ".webp" : ".jpg";
+
+			bool alreadyMatches = sourceExtension == targetExtension || (targetExtension == ".jpg" && sourceExtension == ".jpeg");
+
+			return alreadyMatches ? sourceExtension : targetExtension;
+		}
+
 		/// <summary>
 		/// Epubを生成
 		/// </summary>
@@ -241,17 +262,31 @@ namespace EpubMaker
 
 				WriteTextEntry( archive, "META-INF/container.xml", BuildContainerXml() );
 				WriteTextEntry( archive, "OEBPS/content.opf", BuildContentOpf(pages) );
-				WriteTextEntry( archive, "OEBPS/nav.xhtml", BuildNavXhtml() );
+				WriteTextEntry( archive, "OEBPS/nav.xhtml", BuildNavXhtml(pages) );
 
 				for (int i = 0; i < pages.Count; i++)
 				{
 					string pageNumber = (i + 1).ToString("D4");
-					string extension = Path.GetExtension(pages[i].ImagePath);
+					string sourceExtension = Path.GetExtension(pages[i].ImagePath).ToLowerInvariant();
+					string outputExtension = OutputExtension(pages[i].ImagePath);
 
-					// 画像ファイルを追加
-					archive.CreateEntryFromFile(pages[i].ImagePath, $"OEBPS/images/page{pageNumber}{extension}");
+					if (sourceExtension == ".jpg" || sourceExtension == ".jpeg")
+					{
+						// 既にJPEGならそのままコピー(再エンコードによる劣化を避ける)
+						archive.CreateEntryFromFile(pages[i].ImagePath, $"OEBPS/images/page{pageNumber}{outputExtension}");
+					}
+					else
+					{
+						// JPEG以外(WebP含む)はImageLoaderで読み込んでJPEGに変換
+						byte[] convertedBytes = outputImageFormat == OutputImageFormats.WebP? ImageLoader.ConvertToWebp(pages[i].ImagePath) : ImageLoader.ConvertToJpeg(pages[i].ImagePath);
+						ZipArchiveEntry imageEntry = archive.CreateEntry($"OEBPS/images/page{pageNumber}{outputExtension}", CompressionLevel.Optimal);
+						using ( Stream imageStream = imageEntry.Open() )
+						{
+							imageStream.Write(convertedBytes, 0, convertedBytes.Length);
+						}
+					}
 					// XHTMLファイルを追加
-					WriteTextEntry( archive, $"OEBPS/text/page{pageNumber}.xhtml", BuildPageXhtml(pageNumber, extension) );
+					WriteTextEntry( archive, $"OEBPS/text/page{pageNumber}.xhtml", BuildPageXhtml(pageNumber, outputExtension) );
 				}
 			}
 		}
@@ -286,13 +321,10 @@ namespace EpubMaker
 			for (int i = 0; i < pages.Count; i++)
 			{
 				string pageNumber = (i + 1).ToString("D4");
-				string extension = Path.GetExtension(pages[i].ImagePath).ToLowerInvariant();
+				string extension = OutputExtension(pages[i].ImagePath);
 				string mediaType = extension switch
 				{
 					".jpg" or ".jpeg" => "image/jpeg",
-					".png" => "image/png",
-					".gif" => "image/gif",
-					".bmp" => "image/bmp",
 					".webp" => "image/webp",
 					_ => "application/octet-stream"
 				};
@@ -326,20 +358,32 @@ namespace EpubMaker
 				""";
 		}
 
-		private static string BuildNavXhtml()
+		private static string BuildNavXhtml(List<Page> pages)
 		{
+			StringBuilder pageList = new ();
+			for (int i = 0; i < pages.Count; i++)
+			{
+				string pageNumber = (i + 1).ToString("D4");
+				pageList.AppendLine($"""			<li><a href="text/page{pageNumber}.xhtml">page{pageNumber}</a></li>""");
+			}
+
 			return
-				"""
+				$"""
 				<?xml version="1.0" encoding="UTF-8"?>
 				<!DOCTYPE html>
 				<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
 					<head><title>Navigation</title></head>
 					<body>
-					  <nav epub:type="toc" id="toc">
-						  <ol>
-							  <li><a href="text/page0001.xhtml">先頭</a></li>
-						  </ol>
-					  </nav>
+						<nav epub:type="toc" id="toc">
+							<ol>
+								<li><a href="text/page0001.xhtml">先頭</a></li>
+							</ol>
+						</nav>
+						<nav epub:type="page-list" id="page-list" hidden="">
+							<ol>
+								{pageList}
+							</ol>
+						</nav>
 					</body>
 				</html>
 				""";
