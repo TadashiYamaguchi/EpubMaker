@@ -73,7 +73,7 @@ namespace EpubMaker
 		public ReadingDirections ReadingDirection { get => readingDirection; set => SetProperty(ref readingDirection, value); }
 		private string ReadingDirectionValue => readingDirection == ReadingDirections.RightToLeft ? "rtl" : "ltr";
 
-		private static readonly string[] ImageExtensions = { ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tiff", ".webp" };
+		private static readonly string[] ImageExtensions = { ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp" };
 
 		private static readonly UTF8Encoding Utf8NoBom = new UTF8Encoding(false);
 
@@ -293,7 +293,6 @@ namespace EpubMaker
 					".png" => "image/png",
 					".gif" => "image/gif",
 					".bmp" => "image/bmp",
-					".tiff" => "image/tiff",
 					".webp" => "image/webp",
 					_ => "application/octet-stream"
 				};

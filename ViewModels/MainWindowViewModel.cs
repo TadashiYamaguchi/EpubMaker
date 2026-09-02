@@ -1,4 +1,5 @@
 ﻿using System.IO;
+using System.Windows;
 
 namespace EpubMaker
 {
@@ -7,6 +8,7 @@ namespace EpubMaker
 		#region MainWindowViewModel プロパティ
 
 		private readonly IFolderBrowserService folderBrowserService;
+		private readonly IMessageBoxService messageBoxService;
 
 		public DelegateCommand WindowClosedCommand { get; }
 		public DelegateCommand BrowseDirectoryCommand { get; }
@@ -83,15 +85,13 @@ namespace EpubMaker
 		// <summary>
 		// コンストラクタ
 		// </summary>
-		public MainWindowViewModel(IFolderBrowserService folderBrowserService)
+		public MainWindowViewModel(IFolderBrowserService folderBrowserService, IMessageBoxService messageBoxService)
 		{
 			this.folderBrowserService = folderBrowserService;
+			this.messageBoxService = messageBoxService;
+
 			WindowClosedCommand = new (OnWindowClosed);
-			BrowseDirectoryCommand = new ( () =>
-			{
-				OutputDirectory = folderBrowserService.BrowseFolder();
-				DelegateCommand.ReiseCanExecuteChange();
-			} );
+			BrowseDirectoryCommand = new (OnBrowseDirectory);
 			StartConversionCommand = new (OnStartConversion, () => Volumes.Count > 0 && !isConverting && !string.IsNullOrWhiteSpace(outputDirectory) );
 		}
 
@@ -114,6 +114,16 @@ namespace EpubMaker
 		}
 
 		/// <summary>
+		/// 参照ボタン押下イベント
+		/// </summary>
+		private void OnBrowseDirectory()
+		{
+			OutputDirectory = folderBrowserService.BrowseFolder();
+
+			DelegateCommand.ReiseCanExecuteChange();
+		}
+
+		/// <summary>
 		/// 変換開始イベント
 		/// </summary>
 		private async void OnStartConversion()
@@ -128,6 +138,8 @@ namespace EpubMaker
 
 			isConverting = false;
 			DelegateCommand.ReiseCanExecuteChange();
+
+			messageBoxService.Show("変換が完了しました。", Application.Current.MainWindow.Title, MessageBoxButton.OK, MessageBoxImage.Information);
 		}
 
 		#endregion

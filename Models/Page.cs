@@ -14,10 +14,10 @@ namespace EpubMaker
 		private string fileName = string.Empty;
 		public string FileName { get => fileName; set => SetProperty(ref fileName, value); }
 
-		public ImageSource Thumbnail { get; }
-
 		private bool isExcluded = false;
 		public bool IsExcluded { get => isExcluded; set => SetProperty(ref isExcluded, value); }
+
+		public ImageSource Thumbnail { get; }
 
 		#endregion
 
