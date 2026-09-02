@@ -343,6 +343,7 @@ namespace EpubMaker
 						<dc:identifier id="BookId">urn:uuid:{Guid.NewGuid()}</dc:identifier>
 						<dc:title>{name}</dc:title>
 						<dc:language>ja</dc:language>
+						<meta property="dcterms:modified">{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ssZ}</meta>
 						<meta property="rendition:layout">pre-paginated</meta>
 						<meta property="rendition:orientation">auto</meta>
 						<meta property="rendition:spread">auto</meta>
