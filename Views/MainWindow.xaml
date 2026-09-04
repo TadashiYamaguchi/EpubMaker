@@ -10,6 +10,18 @@
 		Title="EpubMaker" Height="450" Width="800">
 	<Window.Resources>
 		<g:EnumToBooleanConverter x:Key="EnumToBooleanConverter"/>
+
+		<Style x:Key="EditableCellTextBoxStyle" TargetType="TextBox">
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
+			<Style.Triggers>
+				<Trigger Property="IsFocused" Value="True">
+					<Setter Property="Background" Value="White"/>
+					<Setter Property="BorderBrush" Value="#007ACC"/>
+				</Trigger>
+			</Style.Triggers>
+		</Style>
 	</Window.Resources>
 
 	<i:Interaction.Triggers>
@@ -31,11 +43,12 @@
 		<!-- 巻リスト -->
 		<ListView Grid.Row="0" ItemsSource="{Binding Volumes}" SelectedItem="{Binding SelectedVolume, Mode=TwoWay}" AllowDrop="True">
 			<i:Interaction.Behaviors>
-				<local:DragAndDropBehavior DropFiles="{Binding DropFiles, Mode=OneWayToSource}" AllowedExtensions=".zip,.rar"/>
+				<local:DragAndDropBehavior DropFiles="{Binding DropFiles, Mode=OneWayToSource}" AllowedExtensions=".zip,.rar,.epub"/>
 			</i:Interaction.Behaviors>
 
 			<ListView.ItemContainerStyle>
 				<Style TargetType="ListViewItem">
+					<EventSetter Event="MouseDoubleClick" Handler="OnMouseDoubleClick"/>
 					<Setter Property="ContextMenu">
 						<Setter.Value>
 							<ContextMenu>
@@ -65,6 +78,8 @@
 								</MenuItem>
 								<Separator/>
 								<MenuItem Header="白紙ページを自動除外" Command="{Binding PlacementTarget.DataContext.AutoExcludeBlankPagesCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+								<Separator/>
+								<MenuItem Header="詳細設定" Command="{Binding PlacementTarget.DataContext.VolumeDetailCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
 							</ContextMenu>
 						</Setter.Value>
 					</Setter>
@@ -74,7 +89,7 @@
 			<ListView.View>
 				<GridView>
 					<!-- 出力対象フラグ -->
-					<GridViewColumn Header="選択" Width="50">
+					<GridViewColumn Header="選択" Width="40">
 						<GridViewColumn.CellTemplate>
 							<DataTemplate>
 								<CheckBox IsChecked="{Binding IsTarget, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center"/>
@@ -82,24 +97,11 @@
 						</GridViewColumn.CellTemplate>
 					</GridViewColumn>
 
-					<!-- 手動リネーム用テキストボックス（英字を日本語にその場で変更） -->
-					<GridViewColumn Header="巻名 (クリックして変更可能)" Width="230">
+					<!-- 巻タイトル -->
+					<GridViewColumn Header="巻タイトル" Width="230">
 						<GridViewColumn.CellTemplate>
 							<DataTemplate>
-								<TextBox Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center">
-									<TextBox.Style>
-										<Style TargetType="TextBox">
-											<Setter Property="Background" Value="Transparent"/>
-											<Setter Property="BorderBrush" Value="Transparent"/>
-											<Style.Triggers>
-												<Trigger Property="IsFocused" Value="True">
-													<Setter Property="Background" Value="White"/>
-													<Setter Property="BorderBrush" Value="#007ACC"/>
-												</Trigger>
-											</Style.Triggers>
-										</Style>
-									</TextBox.Style>
-								</TextBox>
+								<TextBox Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Style="{StaticResource EditableCellTextBoxStyle}"/>
 							</DataTemplate>
 						</GridViewColumn.CellTemplate>
 					</GridViewColumn>

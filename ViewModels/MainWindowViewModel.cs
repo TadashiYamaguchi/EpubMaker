@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System.Diagnostics;
+using System.IO;
 using System.Windows;
 
 namespace EpubMaker
@@ -21,10 +22,22 @@ namespace EpubMaker
 		private Volume? selectedVolume = null;
 		public Volume? SelectedVolume { get => selectedVolume; set => SetProperty(ref selectedVolume, value); }
 
-		private string outputDirectory = string.Empty;
-		public string OutputDirectory { get => outputDirectory; set => SetProperty(ref outputDirectory, value); }
-
 		private bool isConverting = false;
+
+		private string outputDirectory = Settings.Default.OutputDirectory;
+		public string OutputDirectory
+		{
+			get => outputDirectory;
+			set
+			{
+				if ( SetProperty(ref outputDirectory, value) )
+				{
+					Settings.Default.OutputDirectory = value;
+					Settings.Default.Save();
+				}
+			}
+		}
+
 
 		public string[] DropFiles
 		{
@@ -46,20 +59,10 @@ namespace EpubMaker
 						// ディレクトリの場合
 						if ( Directory.Exists(fileName) )
 						{
-							string[] subDirectories = Directory.GetDirectories(fileName);
-
-							// 子ディレクトリがある場合
-							if (subDirectories.Length > 0)
+							List<string> volumeDirectories = FindDirectories( fileName, dir => Directory.EnumerateFiles(dir).Any( f => Volume.ImageExtensions.Contains( Path.GetExtension(f).ToLowerInvariant() ) ) );
+							foreach (string volumeDirectory in volumeDirectories)
 							{
-								foreach (string subDirectory in subDirectories)
-								{
-									addVolume(subDirectory, subDirectory);
-								}
-							}
-							// 子ディレクトリがない場合(自身が巻ディレクトリ)
-							else
-							{
-								addVolume(fileName, fileName);
+								addVolume(volumeDirectory, volumeDirectory);
 							}
 						}
 						// ファイル場合
@@ -92,7 +95,7 @@ namespace EpubMaker
 
 			WindowClosedCommand = new (OnWindowClosed);
 			BrowseDirectoryCommand = new (OnBrowseDirectory);
-			StartConversionCommand = new (OnStartConversion, () => Volumes.Count > 0 && !isConverting && !string.IsNullOrWhiteSpace(outputDirectory) );
+			StartConversionCommand = new ( OnStartConversion, () => Volumes.Count > 0 && !isConverting && !string.IsNullOrWhiteSpace(outputDirectory) );
 		}
 
 		/// <summary>
@@ -140,6 +143,35 @@ namespace EpubMaker
 			DelegateCommand.ReiseCanExecuteChange();
 
 			messageBoxService.Show("変換が完了しました。", Application.Current.MainWindow.Title, MessageBoxButton.OK, MessageBoxImage.Information);
+		}
+
+		/// <summary>
+		/// 条件に一致するディレクトリを再帰的に検索
+		/// </summary>
+		/// <param name="directory"></param>
+		/// <param name="predicate"></param>
+		private static List<string> FindDirectories(string directory, Func<string, bool> predicate)
+		{
+			if ( predicate(directory) )
+			{
+				return [directory];
+			}
+
+			List<string> result = [];
+
+			try
+			{
+				foreach (string subDirectory in Directory.GetDirectories(directory))
+				{
+					result.AddRange(FindDirectories(subDirectory, predicate));
+				}
+			}
+			catch (Exception ex)
+			{
+				Debug.WriteLine(ex);
+			}
+
+			return result;
 		}
 
 		#endregion

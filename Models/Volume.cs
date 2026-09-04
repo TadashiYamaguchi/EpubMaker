@@ -1,12 +1,13 @@
-﻿using SharpCompress.Archives;
-using SharpCompress.Common;
-using SharpCompress.Readers;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Xml.Linq;
+
+using SharpCompress.Archives;
+using SharpCompress.Common;
 
 namespace EpubMaker
 {
@@ -17,12 +18,38 @@ namespace EpubMaker
 		public DelegateCommand<OutputImageFormats> OutputImageFormatCommand { get; }
 		public DelegateCommand<ReadingDirections> ReadingDirectionCommand { get; }
 		public DelegateCommand AutoExcludeBlankPagesCommand { get; }
+		public DelegateCommand VolumeDetailCommand { get; }
+
+		// 巻タイトル
+		private string name = string.Empty;
+		public string Name { get => name; set => SetProperty(ref name, value); }
+
+		// 巻番号
+		private int? number;
+		public int? Number { get => number; set => SetProperty(ref number, value); }
+
+		// シリーズ名
+		private string series = string.Empty;
+		public string Series { get => series; set => SetProperty(ref series, value); }
+
+		// 著者名
+		private string author = string.Empty;
+		public string Author { get => author; set => SetProperty(ref author, value); }
+
+		// 出版社名
+		private string publisher = string.Empty;
+		public string Publisher { get => publisher; set => SetProperty(ref publisher, value); }
+
+		// 発行日
+		private DateTime? publishedDate;
+		public DateTime? PublishedDate { get => publishedDate; set => SetProperty(ref publishedDate, value); }
+
+		// あらすじ
+		private string description = string.Empty;
+		public string Description { get => description; set => SetProperty(ref description, value); }
 
 		private string sourceFileName = string.Empty;
 		public ObservableCollectionEx<Page> Pages { get; } = [];
-
-		private string name = string.Empty;
-		public string Name { get => name; set => SetProperty(ref name, value); }
 
 		private int count = 0;
 		public int Count { get => count; set => SetProperty(ref count, value); }
@@ -83,9 +110,9 @@ namespace EpubMaker
 		public ReadingDirections ReadingDirection { get => readingDirection; set => SetProperty(ref readingDirection, value); }
 		private string ReadingDirectionValue => readingDirection == ReadingDirections.RightToLeft ? "rtl" : "ltr";
 
-		private static readonly string[] ImageExtensions = { ".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".gif", ".webp" };
+		public static readonly string[] ImageExtensions = { ".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".gif", ".webp" };
 
-		private static readonly UTF8Encoding Utf8NoBom = new UTF8Encoding(false);
+		private static readonly UTF8Encoding Utf8NoBom = new (false);
 
 		#endregion
 
@@ -110,77 +137,7 @@ namespace EpubMaker
 			OutputImageFormatCommand = new (format => OutputImageFormat = format);
 			ReadingDirectionCommand = new (direction => ReadingDirection = direction);
 			AutoExcludeBlankPagesCommand = new ( async () => await AutoExcludeBlankPagesAsync() );
-		}
-
-		/// <summary>
-		/// 巻リストを生成
-		/// </summary>
-		/// <param name="extractDirectory"></param>
-		public async Task LoadAsync(string extractDirectory)
-		{
-			SetProperty( ref status, VolumeStatus.Extracting, nameof(Status) );
-
-			try
-			{
-				List<Page> pages = await Task.Run( () =>
-				{
-					if ( !Directory.Exists(sourceFileName) )
-					{
-						// アーカイブを開いて全エントリを展開
-						using ( IArchive archive = ArchiveFactory.OpenArchive(sourceFileName, new ReaderOptions { ArchiveEncoding = new ArchiveEncoding { Default = Encoding.GetEncoding(932) } } ) )
-						{
-							foreach (IArchiveEntry entryFile in archive.Entries)
-							{
-								if ( !entryFile.IsDirectory )
-								{
-									entryFile.WriteToDirectory(extractDirectory, new ExtractionOptions
-									{
-										ExtractFullPath = true,
-										Overwrite = true
-									} );
-								}
-							}
-						}
-					}
-					return Directory.EnumerateFiles(extractDirectory, "*.*", SearchOption.AllDirectories).Where( f => ImageExtensions.Contains( Path.GetExtension(f).ToLowerInvariant() ) ).Select( f => new Page(f) ).ToList();
-				} );
-
-				Count = pages.Count;
-				Pages.Clear();
-				Pages.AddRange(pages);
-
-				SetProperty( ref status, VolumeStatus.Ready, nameof(Status) );
-			}
-			catch (Exception ex)
-			{
-				SetProperty( ref status, VolumeStatus.Error, nameof(Status) );
-
-				Debug.WriteLine(ex);
-			}
-		}
-
-		/// <summary>
-		/// Epub形式に変換
-		/// </summary>
-		/// <param name="outputDirectory"></param>
-		public async Task ConvertToEpubAsync(string outputDirectory)
-		{
-			SetProperty( ref status, VolumeStatus.Converting, nameof(Status) );
-
-			try
-			{
-				List<Page> targetPages = Pages.Where( p => !p.IsExcluded ).ToList();
-				string epubFileName = Path.Combine(outputDirectory, OutputFileName);
-
-				await Task.Run( () => BuildEpub(epubFileName, targetPages) );
-
-				SetProperty( ref status, VolumeStatus.Completed, nameof(Status) );
-			}
-			catch (Exception ex)
-			{
-				SetProperty( ref status, VolumeStatus.Error, nameof(Status) );
-				Debug.WriteLine(ex);
-			}
+			VolumeDetailCommand = new (OnVolumeDetail, () => status >= VolumeStatus.Ready && status != VolumeStatus.Error);
 		}
 
 		/// <summary>
@@ -188,7 +145,7 @@ namespace EpubMaker
 		/// </summary>
 		private async Task AutoExcludeBlankPagesAsync()
 		{
-			List<Page> targets = Pages.ToList();
+			List<Page> targets = [.. Pages];
 
 			bool[] isBlanks = await Task.Run( () =>
 			{
@@ -205,6 +162,114 @@ namespace EpubMaker
 			{
 				targets[i].IsExcluded = isBlanks[i];
 			}
+		}
+
+		/// <summary>
+		/// 巻の詳細を表示
+		/// </summary>
+		private void OnVolumeDetail()
+		{
+			var snapshot = (Series, Number, Author, Publisher, PublishedDate, Description);
+
+			VolumeDetailWindow dialog = new () { DataContext = this };
+			bool? result = dialog.ShowDialog();
+			if (result != true)
+			{
+				(Series, Number, Author, Publisher, PublishedDate, Description) = snapshot;
+			}
+		}
+
+		/// <summary>
+		/// 巻リストを生成
+		/// </summary>
+		/// <param name="extractDirectory"></param>
+		public async Task LoadAsync(string extractDirectory)
+		{
+			SetProperty( ref status, VolumeStatus.Extracting, nameof(Status) );
+			DelegateCommand.ReiseCanExecuteChange();
+
+			try
+			{
+				var result = await Task.Run( () =>
+				{
+					if ( !Directory.Exists(sourceFileName) )
+					{
+						// アーカイブを開いて全エントリを展開
+						using ( IArchive archive = ArchiveFactory.OpenArchive(sourceFileName, new SharpCompress.Readers.ReaderOptions { ArchiveEncoding = new ArchiveEncoding { Default = Encoding.GetEncoding(932) } } ) )
+						{
+							foreach (IArchiveEntry entryFile in archive.Entries)
+							{
+								if ( !entryFile.IsDirectory )
+								{
+									entryFile.WriteToDirectory(extractDirectory, new ExtractionOptions
+									{
+										ExtractFullPath = true,
+										Overwrite = true
+									} );
+								}
+							}
+						}
+					}
+
+					List<Page> pages = Directory.EnumerateFiles(extractDirectory, "*.*", SearchOption.AllDirectories).Where( f => ImageExtensions.Contains( Path.GetExtension(f).ToLowerInvariant() ) ).Select( f => new Page(f) ).ToList();
+					string? contentOpf = Directory.EnumerateFiles(extractDirectory, "content.opf", SearchOption.AllDirectories).FirstOrDefault();
+					bool hasMetadata = contentOpf != null;
+					var metadata = hasMetadata? ParseMetadata(contentOpf!) : (string.Empty, null, string.Empty, string.Empty, null, string.Empty);
+
+					return (Pages: pages, Metadata: metadata, hasMetadata);
+				} );
+
+				Count = result.Pages.Count;
+				Pages.Clear();
+				Pages.AddRange(result.Pages);
+
+				if (result.hasMetadata)
+				{
+					Series = result.Metadata.Series;
+					Number = result.Metadata.Number;
+					Author = result.Metadata.Author;
+					Publisher = result.Metadata.Publisher;
+					publishedDate = result.Metadata.publishedDate;
+					Description = result.Metadata.Description;
+				}
+
+				SetProperty( ref status, VolumeStatus.Ready, nameof(Status) );
+			}
+			catch (Exception ex)
+			{
+				SetProperty( ref status, VolumeStatus.Error, nameof(Status) );
+
+				Debug.WriteLine(ex);
+			}
+
+			DelegateCommand.ReiseCanExecuteChange();
+		}
+
+		/// <summary>
+		/// Epub形式に変換
+		/// </summary>
+		/// <param name="outputDirectory"></param>
+		public async Task ConvertToEpubAsync(string outputDirectory)
+		{
+			SetProperty( ref status, VolumeStatus.Converting, nameof(Status) );
+			DelegateCommand.ReiseCanExecuteChange();
+
+			try
+			{
+				List<Page> targetPages = Pages.Where( p => !p.IsExcluded ).ToList();
+				string epubFileName = Path.Combine(outputDirectory, OutputFileName);
+
+				await Task.Run( () => BuildEpub(epubFileName, targetPages) );
+
+				SetProperty( ref status, VolumeStatus.Completed, nameof(Status) );
+			}
+			catch (Exception ex)
+			{
+				SetProperty( ref status, VolumeStatus.Error, nameof(Status) );
+				Debug.WriteLine(ex);
+			}
+
+			DelegateCommand.ReiseCanExecuteChange();
 		}
 
 		/// <summary>
@@ -233,6 +298,10 @@ namespace EpubMaker
 			return result;
 		}
 
+		/// <summary>
+		/// 出力ファイルの拡張子を取得
+		/// </summary>
+		/// <param name="fileName"></param>
 		private string OutputExtension(string fileName)
 		{
 			string sourceExtension = Path.GetExtension(fileName).ToLowerInvariant();
@@ -291,7 +360,13 @@ namespace EpubMaker
 			}
 		}
 
-		private void WriteTextEntry(ZipArchive archive, string entryName, string content)
+		/// <summary>
+		/// テキストエントリをZIPアーカイブに書き込む
+		/// </summary>
+		/// <param name="archive"></param>
+		/// <param name="entryName"></param>
+		/// <param name="content"></param>
+		private static void WriteTextEntry(ZipArchive archive, string entryName, string content)
 		{
 			ZipArchiveEntry entry = archive.CreateEntry(entryName, CompressionLevel.Optimal);
 			using ( StreamWriter writer = new ( entry.Open(), Utf8NoBom ) )
@@ -300,6 +375,9 @@ namespace EpubMaker
 			}
 		}
 
+		/// <summary>
+		/// container.xmlを生成
+		/// </summary>
 		private static string BuildContainerXml()
 		{
 			return
@@ -313,6 +391,10 @@ namespace EpubMaker
 				""";
 		}
 
+		/// <summary>
+		/// content.opfを生成
+		/// </summary>
+		/// <param name="pages"></param>
 		private string BuildContentOpf(List<Page> pages)
 		{
 			StringBuilder manifest = new ();
@@ -335,6 +417,23 @@ namespace EpubMaker
 				spine.AppendLine($"""		<itemref idref="text{pageNumber}"/>""");
 			}
 
+			StringBuilder seriesMeta = new ();
+			if ( !string.IsNullOrWhiteSpace(series) )
+			{
+				seriesMeta.AppendLine($"""	<meta property="belongs-to-collection" id="series">{series}</meta>""");
+				seriesMeta.AppendLine($"""	<meta refines="#series" property="collection-type">series</meta>""");
+
+				if (number.HasValue)
+				{
+					seriesMeta.AppendLine($"""	<meta refines="#series" property="group-position">{number.Value}</meta>""");
+				}
+			}
+
+			string creatorElement = string.IsNullOrWhiteSpace(author) ? "" : $"""	<dc:creator>{author}</dc:creator>""";
+			string publisherElement = string.IsNullOrWhiteSpace(publisher) ? "" : $"""	<dc:publisher>{publisher}</dc:publisher>""";
+			string publishedDateElement = PublishedDate.HasValue ? $"""	<dc:date>{PublishedDate.Value:yyyy-MM-dd}</dc:date>""" : "";
+			string descriptionElement = string.IsNullOrWhiteSpace(description) ? "" : $"""	<dc:description>{description}</dc:description>""";
+
 			return
 				$"""
 				<?xml version="1.0" encoding="UTF-8"?>
@@ -342,11 +441,16 @@ namespace EpubMaker
 					<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
 						<dc:identifier id="BookId">urn:uuid:{Guid.NewGuid()}</dc:identifier>
 						<dc:title>{name}</dc:title>
+						{creatorElement}
+						{publisherElement}
+						{publishedDateElement}
+						{descriptionElement}
 						<dc:language>ja</dc:language>
 						<meta property="dcterms:modified">{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ssZ}</meta>
 						<meta property="rendition:layout">pre-paginated</meta>
 						<meta property="rendition:orientation">auto</meta>
 						<meta property="rendition:spread">auto</meta>
+						{seriesMeta}
 					</metadata>
 					<manifest>
 						<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
@@ -359,6 +463,10 @@ namespace EpubMaker
 				""";
 		}
 
+		/// <summary>
+		/// nav.xhtmlを生成
+		/// </summary>
+		/// <param name="pages"></param>
 		private static string BuildNavXhtml(List<Page> pages)
 		{
 			StringBuilder pageList = new ();
@@ -390,6 +498,11 @@ namespace EpubMaker
 				""";
 		}
 
+		/// <summary>
+		/// pageXhtmlを生成
+		/// </summary>
+		/// <param name="pageNumber"></param>
+		/// <param name="extension"></param>
 		private static string BuildPageXhtml(string pageNumber, string extension)
 		{
 			return
@@ -407,6 +520,45 @@ namespace EpubMaker
 				  </body>
 				</html>
 				""";
+		}
+
+		private static (string Series, int? Number, string Author, string Publisher, DateTime? publishedDate, string Description) ParseMetadata(string contentOpf)
+		{
+			XNamespace opf = "http://www.idpf.org/2007/opf";
+			XNamespace dc = "http://purl.org/dc/elements/1.1/";
+
+			XDocument doc = XDocument.Load(contentOpf);
+			XElement? metadata = doc.Root?.Element(opf + "metadata");
+
+			string series = string.Empty;
+			int? number = null;
+
+			XElement? collectionMeta = metadata?.Elements(opf + "meta").FirstOrDefault( m => (string?)m.Attribute("property") == "belongs-to-collection" );
+			if (collectionMeta != null)
+			{
+				series = collectionMeta.Value;
+				string? id = (string?)collectionMeta.Attribute("id");
+
+				XElement? positionMeta = metadata?.Elements(opf + "meta").FirstOrDefault( m => (string?)m.Attribute("refines") == $"#{id}" && (string?)m.Attribute("property") == "group-position" );
+				if (positionMeta != null && int.TryParse(positionMeta.Value, out int parsedNumber))
+				{
+					number = parsedNumber;
+				}
+			}
+
+			string author = metadata?.Element(dc + "creator")?.Value ?? string.Empty;
+			string publisher = metadata?.Element(dc + "publisher")?.Value ?? string.Empty;
+
+			DateTime? publishedDate = null;
+			XElement? dateElement = metadata?.Element(dc + "date");
+			if ( dateElement != null && DateTime.TryParseExact(dateElement.Value, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None,	out DateTime parsedDate) )
+			{
+				publishedDate = parsedDate;
+			}
+
+			string description = metadata?.Element(dc + "description")?.Value ?? string.Empty;
+
+			return (series, number, author, publisher, publishedDate, description);
 		}
 
 		#endregion
