@@ -43,7 +43,6 @@ namespace EpubMaker
 			}
 		}
 
-
 		public string[] DropFiles
 		{
 			set
@@ -262,6 +261,11 @@ namespace EpubMaker
 			return result;
 		}
 
+		/// <summary>
+		/// 指定されたボリュームの共通の値を取得
+		/// </summary>
+		/// <param name="volumes"></param>
+		/// <param name="selector"></param>
 		private static string GetCommonValue(IEnumerable<Volume> volumes, Func<Volume, string?> selector)
 		{
 			List<string> distinct = [.. volumes.Select(selector).Distinct()];
