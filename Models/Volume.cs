@@ -89,6 +89,8 @@ namespace EpubMaker
 			}
 		}
 
+		public bool IsReady => status >= VolumeStatus.Ready && status != VolumeStatus.Error;
+
 		public string OutputFileName => $"{name}.epub";
 
 		public enum OutputImageFormats
@@ -137,7 +139,7 @@ namespace EpubMaker
 			OutputImageFormatCommand = new (format => OutputImageFormat = format);
 			ReadingDirectionCommand = new (direction => ReadingDirection = direction);
 			AutoExcludeBlankPagesCommand = new ( async () => await AutoExcludeBlankPagesAsync() );
-			VolumeDetailCommand = new (OnVolumeDetail, () => status >= VolumeStatus.Ready && status != VolumeStatus.Error);
+			VolumeDetailCommand = new (OnVolumeDetail, () => IsReady);
 		}
 
 		/// <summary>

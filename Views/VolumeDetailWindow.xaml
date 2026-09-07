@@ -6,16 +6,16 @@
 		xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 		xmlns:local="clr-namespace:EpubMaker"
 		mc:Ignorable="d"
-		Title="巻詳細" Height="450" Width="420" WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+		Title="巻の詳細" Height="450" Width="420" WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
 	<Grid Margin="15">
 		<Grid.RowDefinitions>
-			<RowDefinition Height="Auto"/>
-			<RowDefinition Height="Auto"/>
-			<RowDefinition Height="Auto"/>
-			<RowDefinition Height="Auto"/>
-			<RowDefinition Height="Auto"/>
-			<RowDefinition Height="*"/>
-			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="Auto"/>	<!-- シリーズ名 -->
+			<RowDefinition Height="Auto"/>	<!-- 巻数 -->
+			<RowDefinition Height="Auto"/>	<!-- 著者 -->
+			<RowDefinition Height="Auto"/>	<!-- 出版社 -->
+			<RowDefinition Height="Auto"/>	<!-- 発行日 -->
+			<RowDefinition Height="*"/>		<!-- あらすじ -->
+			<RowDefinition Height="Auto"/>	<!-- ボタン -->
 		</Grid.RowDefinitions>
 		<Grid.ColumnDefinitions>
 			<ColumnDefinition Width="90"/>
@@ -25,8 +25,8 @@
 		<TextBlock Grid.Row="0" Grid.Column="0" Text="シリーズ名:" VerticalAlignment="Center" Margin="0,0,10,8"/>
 		<TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Series, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8"/>
 
-		<TextBlock Grid.Row="1" Grid.Column="0" Text="巻数:" VerticalAlignment="Center" Margin="0,0,10,8"/>
-		<TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Number, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Left" Width="80" Margin="0,0,0,8"/>
+		<TextBlock x:Name="NumberLabel" Grid.Row="1" Grid.Column="0" Text="巻数:" VerticalAlignment="Center" Margin="0,0,10,8"/>
+		<TextBox x:Name="NumberTextBox" Grid.Row="1" Grid.Column="1" Text="{Binding Number, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Left" Width="80" Margin="0,0,0,8"/>
 
 		<TextBlock Grid.Row="2" Grid.Column="0" Text="著者:" VerticalAlignment="Center" Margin="0,0,10,8"/>
 		<TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Author, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8"/>
@@ -34,11 +34,11 @@
 		<TextBlock Grid.Row="3" Grid.Column="0" Text="出版社:" VerticalAlignment="Center" Margin="0,0,10,8"/>
 		<TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Publisher, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8"/>
 
-		<TextBlock Grid.Row="4" Grid.Column="0" Text="発行日:" VerticalAlignment="Center" Margin="0,0,10,8"/>
-		<DatePicker Grid.Row="4" Grid.Column="1" SelectedDate="{Binding PublishedDate, Mode=TwoWay}" HorizontalAlignment="Left" Width="150" Margin="0,0,0,8"/>
+		<TextBlock x:Name="PublishedDateLabel" Grid.Row="4" Grid.Column="0" Text="発行日:" VerticalAlignment="Center" Margin="0,0,10,8"/>
+		<DatePicker x:Name="PublishedDatePicker" Grid.Row="4" Grid.Column="1" SelectedDate="{Binding PublishedDate, Mode=TwoWay}" HorizontalAlignment="Left" Width="150" Margin="0,0,0,8"/>
 
-		<TextBlock Grid.Row="5" Grid.Column="0" Text="あらすじ:" VerticalAlignment="Top" Margin="0,0,10,8"/>
-		<TextBox Grid.Row="5" Grid.Column="1" Text="{Binding Description, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" Margin="0,0,0,8"/>
+		<TextBlock x:Name="DescriptionLabel" Grid.Row="5" Grid.Column="0" Text="あらすじ:" VerticalAlignment="Top" Margin="0,0,10,8"/>
+		<TextBox x:Name="DescriptionTextBox" Grid.Row="5" Grid.Column="1" Text="{Binding Description, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" Margin="0,0,0,8"/>
 
 		<StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
 			<Button Content="適用" Width="80" Height="28" Margin="0,0,8,0" IsDefault="True" Click="OnApply"/>

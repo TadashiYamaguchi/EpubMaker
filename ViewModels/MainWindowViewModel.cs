@@ -15,6 +15,8 @@ namespace EpubMaker
 		public DelegateCommand WindowClosedCommand { get; }
 		public DelegateCommand BrowseDirectoryCommand { get; }
 		public DelegateCommand StartConversionCommand { get; }
+		public DelegateCommand AllDetailsCommand { get; }
+		public DelegateCommand ClearCommand { get; }
 
 		private readonly string tempRootDirectory = Path.Combine( Path.GetTempPath(), "EpubMaker" );
 
@@ -22,6 +24,8 @@ namespace EpubMaker
 
 		private Volume? selectedVolume = null;
 		public Volume? SelectedVolume { get => selectedVolume; set => SetProperty(ref selectedVolume, value); }
+		public ObservableCollectionEx<Volume> SelectedVolumes { get; } = [];
+		public bool IsSingleSelection => SelectedVolumes.Count <= 1;
 
 		private bool isConverting = false;
 
@@ -46,13 +50,13 @@ namespace EpubMaker
 			{
 				if (value != null)
 				{
+					List<(Volume volume, string ExtractDirectory)> loadings = [];
 					Action<string, string> addVolume = (sourceFile, extractDirectory) =>
 					{
 						// 巻リストを生成
 						Volume volume = new (sourceFile);
 						Volumes.Add(volume);
-						// 巻の展開処理を非同期で開始
-						_ = volume.LoadAsync(extractDirectory);
+						loadings.Add( (volume, extractDirectory) );
 					};
 
 					foreach (string fileName in value)
@@ -77,6 +81,29 @@ namespace EpubMaker
 						}
 					}
 
+					Window owner = Application.Current.MainWindow;
+					owner.IsEnabled = false;
+					progressService.Start(loadings.Count, "読み込み中");
+
+					async Task LoadAllAsync()
+					{
+						int completedCount = 0;
+						List<Task> loadTasks = loadings.Select(async p =>
+						{
+							await p.volume.LoadAsync(p.ExtractDirectory);
+							completedCount++;
+							progressService.Report($"{p.volume.Name}の読み込み中...", completedCount);
+						} ).ToList();
+
+						await Task.WhenAll(loadTasks);
+
+						progressService.Complete();
+						owner.IsEnabled = true;
+					}
+
+					// 巻の展開処理を非同期で開始
+					_ = LoadAllAsync();
+
 					DelegateCommand.ReiseCanExecuteChange();
 				}
 			}
@@ -98,6 +125,8 @@ namespace EpubMaker
 			WindowClosedCommand = new (OnWindowClosed);
 			BrowseDirectoryCommand = new (OnBrowseDirectory);
 			StartConversionCommand = new ( OnStartConversion, () => Volumes.Count > 0 && !isConverting && !string.IsNullOrWhiteSpace(outputDirectory) );
+			AllDetailsCommand = new (OnAllDetails, () => SelectedVolumes.Count > 0 && !isConverting && SelectedVolumes.All(v => v.IsReady) );
+			ClearCommand = new (OnClear, () => Volumes.Count > 0 && !isConverting);
 		}
 
 		/// <summary>
@@ -151,11 +180,51 @@ namespace EpubMaker
 			}
 			
 			progressService.Complete();
+			owner.IsEnabled = true;
 
 			isConverting = false;
 			DelegateCommand.ReiseCanExecuteChange();
 
 			messageBoxService.Show("変換が完了しました。", Application.Current.MainWindow.Title, MessageBoxButton.OK, MessageBoxImage.Information);
+		}
+
+		/// <summary>
+		/// 全巻詳細イベント
+		/// </summary>
+		private void OnAllDetails()
+		{
+			AllDetails dataContext = new ();
+			VolumeDetailWindow dialog = new () { Title = "全巻詳細", DataContext = dataContext };
+			if ( dialog.ShowDialog() == true )
+			{
+				foreach (Volume volume in SelectedVolumes)
+				{
+					if ( !String.IsNullOrWhiteSpace(dataContext.Series) )
+					{
+						volume.Series = dataContext.Series;
+					}
+					if ( !String.IsNullOrWhiteSpace(dataContext.Author) )
+					{
+						volume.Author = dataContext.Author;
+					}
+					if ( !String.IsNullOrWhiteSpace(dataContext.Publisher) )
+					{
+						volume.Publisher = dataContext.Publisher;
+					}
+				}
+			}
+		}
+
+		/// <summary>
+		/// リストをクリアイベント
+		/// </summary>
+		private void OnClear()
+		{
+			Volumes.Clear();
+			SelectedVolumes.Clear();
+			SelectedVolume = null;
+
+			DelegateCommand.ReiseCanExecuteChange();
 		}
 
 		/// <summary>

@@ -41,14 +41,16 @@
 		</Grid.RowDefinitions>
 
 		<!-- 巻リスト -->
-		<ListView Grid.Row="0" ItemsSource="{Binding Volumes}" SelectedItem="{Binding SelectedVolume, Mode=TwoWay}" AllowDrop="True">
+		<ListView Grid.Row="0" ItemsSource="{Binding Volumes}" SelectedItem="{Binding SelectedVolume, Mode=TwoWay}" SelectionMode="Extended" AllowDrop="True">
 			<i:Interaction.Behaviors>
 				<local:DragAndDropBehavior DropFiles="{Binding DropFiles, Mode=OneWayToSource}" AllowedExtensions=".zip,.rar,.epub"/>
+				<g:SelectedItemsBehavior SelectedItems="{Binding SelectedVolumes, Mode=OneWay}"/>
 			</i:Interaction.Behaviors>
 
 			<ListView.ItemContainerStyle>
 				<Style TargetType="ListViewItem">
 					<EventSetter Event="MouseDoubleClick" Handler="OnMouseDoubleClick"/>
+					<Setter Property="Tag" Value="{Binding RelativeSource={RelativeSource AncestorType=ListView}, Path=DataContext}"/>
 					<Setter Property="ContextMenu">
 						<Setter.Value>
 							<ContextMenu>
@@ -79,7 +81,12 @@
 								<Separator/>
 								<MenuItem Header="白紙ページを自動除外" Command="{Binding PlacementTarget.DataContext.AutoExcludeBlankPagesCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
 								<Separator/>
-								<MenuItem Header="詳細設定" Command="{Binding PlacementTarget.DataContext.VolumeDetailCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+								<MenuItem Header="詳細設定">
+									<MenuItem Header="詳細設定 (巻のみ)" Command="{Binding PlacementTarget.DataContext.VolumeDetailCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" IsEnabled="{Binding PlacementTarget.Tag.IsSingleSelection, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+									<MenuItem Header="詳細設定 (全巻)" Command="{Binding PlacementTarget.Tag.AllDetailsCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+								</MenuItem>
+								<Separator/>
+								<MenuItem Header="リストをクリア" Command="{Binding PlacementTarget.Tag.ClearCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
 							</ContextMenu>
 						</Setter.Value>
 					</Setter>
