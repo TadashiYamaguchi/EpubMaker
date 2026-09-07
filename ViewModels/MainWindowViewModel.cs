@@ -193,7 +193,13 @@ namespace EpubMaker
 		/// </summary>
 		private void OnAllDetails()
 		{
-			AllDetails dataContext = new ();
+			AllDetails dataContext = new ()
+			{
+				Series = GetCommonValue(SelectedVolumes, v => v.Series),
+				Author = GetCommonValue(SelectedVolumes, v => v.Author),
+				Publisher = GetCommonValue(SelectedVolumes, v => v.Publisher)
+			};
+
 			VolumeDetailWindow dialog = new () { Title = "全巻詳細", DataContext = dataContext };
 			if ( dialog.ShowDialog() == true )
 			{
@@ -254,6 +260,12 @@ namespace EpubMaker
 			}
 
 			return result;
+		}
+
+		private static string GetCommonValue(IEnumerable<Volume> volumes, Func<Volume, string?> selector)
+		{
+			List<string> distinct = [.. volumes.Select(selector).Distinct()];
+			return distinct.Count == 1 ? distinct[0] : string.Empty;
 		}
 
 		#endregion
