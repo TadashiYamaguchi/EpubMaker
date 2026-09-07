@@ -7,8 +7,12 @@ public interface IMessageBoxService
 
 public class MessageBoxService : IMessageBoxService
 {
+	#region MessageBoxService メソッド
+
 	public MessageBoxResult Show(string message, string title, MessageBoxButton button, MessageBoxImage icon)
 	{
 		return MessageBox.Show(message, title, button, icon);
 	}
+
+	#endregion
 }

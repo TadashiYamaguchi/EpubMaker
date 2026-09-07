@@ -15,7 +15,7 @@ namespace EpubMaker
 
 			var view = new MainWindow()
 			{
-				DataContext = new MainWindowViewModel( new FolderBrowserService(), new MessageBoxService() )
+				DataContext = new MainWindowViewModel( new FolderBrowserService(), new MessageBoxService(), new ProgressService() )
 			};
 			view.Show();
 		}

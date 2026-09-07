@@ -10,6 +10,7 @@ namespace EpubMaker
 
 		private readonly IFolderBrowserService folderBrowserService;
 		private readonly IMessageBoxService messageBoxService;
+		private readonly IProgressService progressService;
 
 		public DelegateCommand WindowClosedCommand { get; }
 		public DelegateCommand BrowseDirectoryCommand { get; }
@@ -88,10 +89,11 @@ namespace EpubMaker
 		// <summary>
 		// コンストラクタ
 		// </summary>
-		public MainWindowViewModel(IFolderBrowserService folderBrowserService, IMessageBoxService messageBoxService)
+		public MainWindowViewModel(IFolderBrowserService folderBrowserService, IMessageBoxService messageBoxService, IProgressService progressService)
 		{
 			this.folderBrowserService = folderBrowserService;
 			this.messageBoxService = messageBoxService;
+			this.progressService = progressService;
 
 			WindowClosedCommand = new (OnWindowClosed);
 			BrowseDirectoryCommand = new (OnBrowseDirectory);
@@ -134,10 +136,21 @@ namespace EpubMaker
 			isConverting = true;
 			DelegateCommand.ReiseCanExecuteChange();
 
-			foreach (Volume volume in Volumes.Where(v => v.IsTarget) )
+			Window owner = Application.Current.MainWindow;
+			owner.IsEnabled = false;
+
+			List<Volume> targets = Volumes.Where(v => v.IsTarget).ToList();
+			progressService.Start(targets.Count);
+
+			int completedCount = 0;
+			foreach (Volume volume in targets)
 			{
+				progressService.Report($"{volume.Name}のEpubを変換中...", completedCount);
 				await volume.ConvertToEpubAsync(OutputDirectory);
+				completedCount++;
 			}
+			
+			progressService.Complete();
 
 			isConverting = false;
 			DelegateCommand.ReiseCanExecuteChange();

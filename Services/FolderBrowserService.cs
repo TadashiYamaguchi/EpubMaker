@@ -7,9 +7,13 @@ public interface IFolderBrowserService
 
 public class FolderBrowserService : IFolderBrowserService
 {
+	#region FolderBrowserService メソッド
+
 	public string BrowseFolder()
 	{
-		OpenFolderDialog dialog = new OpenFolderDialog();
+		OpenFolderDialog dialog = new ();
 		return dialog.ShowDialog() == true ? dialog.FolderName : string.Empty;
 	}
+
+	#endregion
 }
