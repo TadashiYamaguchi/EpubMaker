@@ -151,7 +151,11 @@ namespace EpubMaker
 		/// </summary>
 		private void OnBrowseDirectory()
 		{
-			OutputDirectory = folderBrowserService.BrowseFolder();
+			string directory = folderBrowserService.BrowseFolder();
+			if ( !string.IsNullOrWhiteSpace(directory) )
+			{
+				OutputDirectory = directory;
+			}
 
 			DelegateCommand.ReiseCanExecuteChange();
 		}
