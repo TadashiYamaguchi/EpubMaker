@@ -213,7 +213,10 @@ namespace EpubMaker
 						}
 					}
 
-					List<Page> pages = Directory.EnumerateFiles(extractDirectory, "*.*", SearchOption.AllDirectories).Where( f => ImageExtensions.Contains( Path.GetExtension(f).ToLowerInvariant() ) ).Select( f => new Page(f) ).ToList();
+					List<Page> pages = Directory.EnumerateFiles(extractDirectory, "*.*", SearchOption.AllDirectories)
+						.Where( f => ImageExtensions.Contains( Path.GetExtension(f).ToLowerInvariant() ) )
+						.OrderBy( f => f, new NaturalStringComparer() )
+						.Select( f => new Page(f) ).ToList();
 					string? contentOpf = Directory.EnumerateFiles(extractDirectory, "content.opf", SearchOption.AllDirectories).FirstOrDefault();
 					bool hasMetadata = contentOpf != null;
 					var metadata = hasMetadata? ParseMetadata(contentOpf!) : (string.Empty, null, string.Empty, string.Empty, null, string.Empty);
@@ -563,6 +566,6 @@ namespace EpubMaker
 			return (series, number, author, publisher, publishedDate, description);
 		}
 
-		#endregion
+#endregion
 	}
 }
