@@ -17,6 +17,7 @@ namespace EpubMaker
 		public DelegateCommand StartConversionCommand { get; }
 		public DelegateCommand AllDetailsCommand { get; }
 		public DelegateCommand ClearCommand { get; }
+		public DelegateCommand SelectedDeleteCommand { get; }
 
 		private readonly string tempRootDirectory = Path.Combine( Path.GetTempPath(), "EpubMaker" );
 
@@ -27,6 +28,7 @@ namespace EpubMaker
 		public ObservableCollectionEx<Volume> SelectedVolumes { get; } = [];
 		public bool IsSingleSelection => SelectedVolumes.Count <= 1;
 
+		// 変換中フラグ
 		private bool isConverting = false;
 
 		private string outputDirectory = Settings.Default.OutputDirectory;
@@ -58,7 +60,7 @@ namespace EpubMaker
 						loadings.Add( (volume, extractDirectory) );
 					};
 
-					foreach (string fileName in value)
+					foreach (string fileName in value.OrderBy( f => f, new NaturalStringComparer() ) )
 					{
 						// ディレクトリの場合
 						if ( Directory.Exists(fileName) )
@@ -126,6 +128,7 @@ namespace EpubMaker
 			StartConversionCommand = new ( OnStartConversion, () => Volumes.Count > 0 && !isConverting && !string.IsNullOrWhiteSpace(outputDirectory) );
 			AllDetailsCommand = new (OnAllDetails, () => SelectedVolumes.Count > 0 && !isConverting && SelectedVolumes.All(v => v.IsReady) );
 			ClearCommand = new (OnClear, () => Volumes.Count > 0 && !isConverting);
+			SelectedDeleteCommand = new (OnSelectedDelete, () => SelectedVolumes.Count > 0 && !isConverting);
 		}
 
 		/// <summary>
@@ -237,6 +240,19 @@ namespace EpubMaker
 		}
 
 		/// <summary>
+		/// 選択した巻を削除イベント
+		/// </summary>
+		private void OnSelectedDelete()
+		{
+			foreach ( Volume volume in SelectedVolumes.ToList() )
+			{
+				Volumes.Remove(volume);
+			}
+
+			DelegateCommand.ReiseCanExecuteChange();
+		}
+
+		/// <summary>
 		/// 条件に一致するディレクトリを再帰的に検索
 		/// </summary>
 		/// <param name="directory"></param>
@@ -252,9 +268,9 @@ namespace EpubMaker
 
 			try
 			{
-				foreach (string subDirectory in Directory.GetDirectories(directory))
+				foreach (string subDirectory in Directory.GetDirectories(directory).OrderBy( d => d, new NaturalStringComparer() ) )
 				{
-					result.AddRange(FindDirectories(subDirectory, predicate));
+					result.AddRange( FindDirectories(subDirectory, predicate) );
 				}
 			}
 			catch (Exception ex)
